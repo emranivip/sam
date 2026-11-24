@@ -1,0 +1,10 @@
+{
+  "name": "منزل الافكار",
+  "description": "مساعدك الذكي لتصميم وتجديد ديكور غرفتك بالذكاء الاصطناعي — اقتراحات ألوان الطلاء، الأثاث، الإضاءة، والأرضيات.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
