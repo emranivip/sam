@@ -26,11 +26,23 @@ export interface DecorProposal {
   quickSteps: string[];
 }
 
+export type ImageProviderId = 'icbinp' | 'dreamshaper' | 'deliberate' | 'flux-schnell';
+
+export interface ImageProviderInfo {
+  id: ImageProviderId;
+  name: string;
+  subtitle: string;
+  supportsPhotoEdit: boolean;
+  configured: boolean;
+  secretName: string;
+}
+
 export interface VisualOption {
   id: string;
   label: string;
   description: string;
   imageDataUrl: string;
+  provider?: ImageProviderId;
 }
 
 export interface DesignRecord {

@@ -27,6 +27,8 @@ import type {
   DecorCategory,
   DecorProposal,
   DesignRecord,
+  ImageProviderId,
+  ImageProviderInfo,
   NavTab,
   UserPreferences,
   VisualOption,
@@ -168,6 +170,8 @@ export default function App() {
   const [activeProposal, setActiveProposal] = useState<DecorProposal | null>(null);
   const [visualOptions, setVisualOptions] = useState<VisualOption[]>([]);
   const [selectedVisualId, setSelectedVisualId] = useState<string | null>(null);
+  const [imageProviders, setImageProviders] = useState<ImageProviderInfo[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<ImageProviderId>('icbinp');
   const [isVisualizing, setIsVisualizing] = useState(false);
   const [isEditingVisual, setIsEditingVisual] = useState(false);
   const [visualError, setVisualError] = useState<string | null>(null);
@@ -176,6 +180,27 @@ export default function App() {
   const [isRefining, setIsRefining] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [historyFilter, setHistoryFilter] = useState<DecorCategory | 'الكل'>('الكل');
+
+  useEffect(() => {
+    let mounted = true;
+    fetch(`${API_BASE}/api/decor/providers`)
+      .then((res) => parseJsonResponse<{ providers?: ImageProviderInfo[] }>(res, ''))
+      .then((data) => {
+        if (!mounted || !data.providers?.length) return;
+        setImageProviders(data.providers);
+        const preferred =
+          data.providers.find((p) => p.configured) ?? data.providers[0];
+        if (preferred) {
+          setSelectedProvider(preferred.id);
+        }
+      })
+      .catch(() => {
+        // Ignore silent provider metadata fetch error
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -278,7 +303,8 @@ export default function App() {
   const generateVisualVariants = async (
     imageSrc: string,
     proposalObj: DecorProposal | null,
-    recordIdToUpdate: string | null
+    recordIdToUpdate: string | null,
+    replaceExisting = false
   ) => {
     setVisualError(null);
     setIsVisualizing(true);
@@ -287,15 +313,19 @@ export default function App() {
         ? imageSrc
         : await urlToBase64DataUrl(imageSrc);
 
+      const variantIndex = replaceExisting ? 0 : visualOptions.length;
+
       const response = await fetch(`${API_BASE}/api/decor/visualize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          provider: selectedProvider,
           imageBase64,
           proposal: proposalObj,
           category: selectedCategory,
           notes: roomNotes,
           stylePreference: preferences.preferredStyle,
+          variantIndex,
         }),
       });
 
@@ -304,23 +334,25 @@ export default function App() {
         'تعذر قراءة استجابة تعديل الصورة.'
       );
       if (!response.ok || !data.options || data.options.length === 0) {
-        throw new Error(data.error || 'تعذر توليد التصورات البصرية حالياً.');
+        throw new Error(data.error || 'تعذر توليد التصور البصري حالياً.');
       }
 
-      const generated = data.options;
-      setVisualOptions(generated);
-      setSelectedVisualId(generated[0].id);
-
-      if (recordIdToUpdate) {
-        setHistory((prev) =>
-          prev.map((rec) =>
-            rec.id === recordIdToUpdate ? { ...rec, visualOptions: generated } : rec
-          )
-        );
-      }
+      const generatedOption = data.options[0];
+      setVisualOptions((prev) => {
+        const next = replaceExisting ? [generatedOption] : [generatedOption, ...prev];
+        if (recordIdToUpdate) {
+          setHistory((hist) =>
+            hist.map((rec) =>
+              rec.id === recordIdToUpdate ? { ...rec, visualOptions: next } : rec
+            )
+          );
+        }
+        return next;
+      });
+      setSelectedVisualId(generatedOption.id);
     } catch (err) {
       setVisualError(
-        err instanceof Error ? err.message : 'تعذر توليد التصورات البصرية للغرفة حالياً.'
+        err instanceof Error ? err.message : 'تعذر توليد التصور البصري للغرفة حالياً.'
       );
     } finally {
       setIsVisualizing(false);
@@ -341,7 +373,9 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          provider: selectedProvider,
           imageBase64,
+          proposal: activeProposal,
           customPrompt,
           category: selectedCategory,
           stylePreference: preferences.preferredStyle,
@@ -426,8 +460,8 @@ export default function App() {
       setVisualOptions([]);
       setSelectedVisualId(null);
 
-      // تشغيل التعديل البصري عبر Nano Banana بالتوازي بعد عرض التوصيات النصية
-      void generateVisualVariants(activeImageSrc, data.proposal, newRecord.id);
+      // توليد تصور بصري واحد للغرفة بالتوازي بعد عرض التوصيات النصية
+      void generateVisualVariants(activeImageSrc, data.proposal, newRecord.id, true);
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'حدث خطأ أثناء الاتصال بخدمة التصميم.');
     } finally {
@@ -853,13 +887,19 @@ export default function App() {
                     originalImageSrc={activeImageSrc}
                     options={visualOptions}
                     selectedOptionId={selectedVisualId}
+                    providers={imageProviders}
+                    selectedProvider={selectedProvider}
                     isGenerating={isVisualizing}
                     isEditingCustom={isEditingVisual}
                     visualError={visualError}
                     hasProposal={!!activeProposal}
+                    onSelectProvider={(p) => {
+                      setSelectedProvider(p);
+                      setVisualError(null);
+                    }}
                     onSelectOption={setSelectedVisualId}
                     onGenerateVariants={() =>
-                      void generateVisualVariants(activeImageSrc, activeProposal, activeRecordId)
+                      void generateVisualVariants(activeImageSrc, activeProposal, activeRecordId, false)
                     }
                     onCustomVisualEdit={handleCustomVisualEdit}
                   />

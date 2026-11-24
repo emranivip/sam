@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import {
+  CheckCircle2,
+  Cpu,
   Download,
   ImagePlus,
   Layers,
@@ -9,17 +11,20 @@ import {
   Sparkles,
   Wand2,
 } from 'lucide-react';
-import type { VisualOption } from '../types';
+import type { ImageProviderId, ImageProviderInfo, VisualOption } from '../types';
 import { ResilientImage } from './ResilientImage';
 
 interface VisualRedesignStudioProps {
   originalImageSrc: string;
   options: VisualOption[];
   selectedOptionId: string | null;
+  providers: ImageProviderInfo[];
+  selectedProvider: ImageProviderId;
   isGenerating: boolean;
   isEditingCustom: boolean;
   visualError: string | null;
   hasProposal: boolean;
+  onSelectProvider: (provider: ImageProviderId) => void;
   onSelectOption: (id: string) => void;
   onGenerateVariants: () => void;
   onCustomVisualEdit: (prompt: string) => Promise<void>;
@@ -36,10 +41,13 @@ export function VisualRedesignStudio({
   originalImageSrc,
   options,
   selectedOptionId,
+  providers,
+  selectedProvider,
   isGenerating,
   isEditingCustom,
   visualError,
   hasProposal,
+  onSelectProvider,
   onSelectOption,
   onGenerateVariants,
   onCustomVisualEdit,
@@ -50,6 +58,9 @@ export function VisualRedesignStudio({
 
   const activeOption =
     options.find((opt) => opt.id === selectedOptionId) ?? options[0] ?? null;
+
+  const activeProviderInfo =
+    providers.find((p) => p.id === selectedProvider) ?? null;
 
   const handleCustomSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -160,15 +171,70 @@ export function VisualRedesignStudio({
             <Loader2 className="w-8 h-8 animate-spin text-[#f7d86b] mb-2.5" />
             <p className="text-sm font-extrabold">
               {isEditingCustom
-                ? 'جاري تعديل الصورة وفق طلبك عبر Nano Banana...'
-                : 'جاري تعديل صورة غرفتك وإنشاء 3 خيارات بصرية...'}
+                ? `جاري تخيل وتعديل الصورة عبر ${activeProviderInfo?.name ?? 'منصة الذكاء الاصطناعي'}...`
+                : `جاري توليد تصور بصري عبر ${activeProviderInfo?.name ?? 'منصة الذكاء الاصطناعي'}...`}
             </p>
             <p className="text-xs text-white/80 mt-1">
-              يتم الحفاظ على أبعاد غرفتك الحقيقية وتوزيع النوافذ والجدران
+              {activeProviderInfo?.supportsPhotoEdit
+                ? 'يتم تعديل صورتك مع الحفاظ على أبعاد الغرفة وتوزيع الجدران والنوافذ'
+                : 'يتم توليد تصورات ديكور مستوحاة من وصف غرفتك وألوانها'}
             </p>
           </div>
         )}
       </div>
+
+      {/* اختيار منصة توليد وتخيل الصور */}
+      {providers.length > 0 && (
+        <div className="rounded-2xl bg-[#f7f3ee] p-3 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-extrabold text-[#3b1c5e] inline-flex items-center gap-1.5">
+              <Cpu className="w-4 h-4 text-[#6c1bb0]" />
+              <span>نماذج الذكاء الاصطناعي المفتوحة والمجانية</span>
+            </span>
+            <span className="text-[11px] font-semibold text-emerald-700">
+              مفتوحة المصدر · مجانية للاستخدام المتكرر بدون مفتاح
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {providers.map((provider) => {
+              const active = provider.id === selectedProvider;
+              return (
+                <button
+                  key={provider.id}
+                  type="button"
+                  onClick={() => onSelectProvider(provider.id)}
+                  className={`rounded-xl px-2.5 py-2 text-right border transition-colors cursor-pointer ${
+                    active
+                      ? 'bg-[#6c1bb0] border-[#6c1bb0] text-white'
+                      : 'bg-white border-[#3b1c5e]/10 text-[#2c1846] hover:border-[#6c1bb0]/40'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[11.5px] font-extrabold truncate" dir="ltr">
+                      {provider.name}
+                    </span>
+                    {provider.configured && (
+                      <CheckCircle2
+                        className={`w-3.5 h-3.5 shrink-0 ${
+                          active ? 'text-[#f7d86b]' : 'text-emerald-600'
+                        }`}
+                      />
+                    )}
+                  </div>
+                  <p
+                    className={`text-[10.5px] mt-0.5 line-clamp-1 ${
+                      active ? 'text-white/85' : 'text-[#6e6478]'
+                    }`}
+                  >
+                    {provider.subtitle}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* شريط التحكم في طريقة العرض وتنزيل الصورة */}
       {activeOption && (
@@ -217,7 +283,7 @@ export function VisualRedesignStudio({
               className="min-h-[36px] px-3 rounded-xl bg-[#efe5f8] hover:bg-[#e3d1f5] text-[#3b1c5e] text-xs font-bold inline-flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>توليد خيارات جديدة</span>
+              <span>توليد تصور جديد</span>
             </button>
             <button
               type="button"
@@ -231,18 +297,18 @@ export function VisualRedesignStudio({
         </div>
       )}
 
-      {/* زر توليد الخيارات البصرية في حال لم تُنشأ بعد (مثل الأفكار الجاهزة) */}
+      {/* زر توليد الخيارات البصرية في حال لم تُنشأ بعد */}
       {options.length === 0 && !isGenerating && (
         <div className="rounded-2xl bg-[#fcf9ff] border border-[#6c1bb0]/20 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-0.5">
             <p className="text-xs sm:text-sm font-extrabold text-[#3b1c5e] flex items-center gap-1.5">
               <Layers className="w-4 h-4 text-[#6c1bb0]" />
-              <span>التصور البصري المباشر بالذكاء الاصطناعي (Nano Banana)</span>
+              <span>توليد تصور بصري عبر {activeProviderInfo?.name ?? 'المنصة المختارة'}</span>
             </p>
             <p className="text-xs text-[#6e6478]">
               {hasProposal
-                ? 'شاهِد غرفتك معدّلة فعلياً بـ 3 خيارات بصرية مختلفة بالإضافة للتوصيات النصية.'
-                : 'اضغط لتوليد 3 تصورات بصرية مختلفة مباشرة على صورة غرفتك.'}
+                ? 'أنشئ صورة بصرية مقترحة لغرفتك بالإضافة للتوصيات النصية.'
+                : 'اضغط لتوليد صورة بصرية مستوحاة من غرفتك.'}
             </p>
           </div>
           <button
@@ -252,7 +318,7 @@ export function VisualRedesignStudio({
             className="min-h-[40px] px-4 rounded-xl bg-[#3b1c5e] hover:bg-[#6c1bb0] text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             <ImagePlus className="w-4 h-4" />
-            <span>توليد 3 خيارات بصرية</span>
+            <span>توليد تصور بصري</span>
           </button>
         </div>
       )}
@@ -262,7 +328,7 @@ export function VisualRedesignStudio({
           role="alert"
           className="rounded-xl bg-amber-50 border border-amber-200 px-3.5 py-2.5 text-xs text-amber-950 leading-5"
         >
-          <span className="font-bold">تنبيه التعديل البصري: </span>
+          <span className="font-bold">تنبيه توليد الصور: </span>
           {visualError}
         </div>
       )}
@@ -272,7 +338,7 @@ export function VisualRedesignStudio({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h4 className="text-xs sm:text-sm font-extrabold text-[#3b1c5e]">
-              خيارات التعديل البصري على صورتك ({options.length})
+              التصورات البصرية المولّدة ({options.length})
             </h4>
             <span className="text-[11px] text-[#6e6478]">اختر تصوراً للمعاينة المباشرة</span>
           </div>
@@ -316,11 +382,11 @@ export function VisualRedesignStudio({
         </div>
       )}
 
-      {/* تعديل بصري مباشر مخصص على الصورة */}
+      {/* تعديل أو تخيل بصري مخصص */}
       <div className="rounded-2xl bg-[#f7f3ee] p-3.5 space-y-2.5">
         <div className="flex items-center gap-1.5 text-xs font-extrabold text-[#3b1c5e]">
           <Wand2 className="w-4 h-4 text-[#6c1bb0]" />
-          <span>عدّل على الصورة مباشرة بأي وصف تريده</span>
+          <span>تخيل أو عدّل الديكور مباشرة بأي وصف تريده</span>
         </div>
 
         <form onSubmit={handleCustomSubmit} className="flex flex-col sm:flex-row gap-2">
@@ -329,7 +395,7 @@ export function VisualRedesignStudio({
             value={customPrompt}
             onChange={(e) => setCustomPrompt(e.target.value)}
             disabled={isEditingCustom || isGenerating}
-            placeholder="مثال: غيّر لون الجدران إلى زيتوني هادئ وأضف طاولة خشبية"
+            placeholder="مثال: غرفة معيشة دافئة بأريكة بيج وإضاءة مخفية ولمسات خشب"
             className="flex-1 min-h-[40px] rounded-xl bg-white border border-[#3b1c5e]/15 px-3 text-xs sm:text-sm text-[#2c1846] placeholder:text-[#6e6478]/70 focus:outline-none focus:border-[#6c1bb0]"
           />
           <button
@@ -340,12 +406,12 @@ export function VisualRedesignStudio({
             {isEditingCustom ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>جاري التعديل...</span>
+                <span>جاري التوليد...</span>
               </>
             ) : (
               <>
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>تعديل الصورة</span>
+                <span>توليد الصورة</span>
               </>
             )}
           </button>
